@@ -1,0 +1,46 @@
+# Environment
+.env
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data — never commit raw datasets to GitHub
+data/raw/*.csv
+data/raw/*.xlsx
+data/raw/*.json
+data/processed/*.csv
+
+# But keep the folder structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/raw/README.md
+
+# Model artifacts (too large for GitHub)
+*.pkl
+*.joblib
+*.h5
+*.tflite
+models/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
