@@ -22,7 +22,7 @@ build/
 data/raw/*.csv
 data/raw/*.xlsx
 data/raw/*.json
-data/processed/*.csv
+# data/processed/*.csv
 
 # But keep the folder structure
 !data/raw/.gitkeep
