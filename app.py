@@ -359,6 +359,47 @@ def nutrient_status(val, lo, hi):
     if val > hi: return "High", "n-high", "#DC2626"
     return "Good", "n-good", "#16a34a"
 
+
+import sqlite3
+
+def init_db():
+    conn = sqlite3.connect('recommendations.db')
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            district TEXT,
+            crop TEXT,
+            dat INTEGER,
+            spray_action TEXT,
+            dose REAL,
+            pest_action TEXT,
+            soil_score INTEGER,
+            confidence REAL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def log_recommendation(district, crop, dat, spray_label, dose, pest_label, soil_score, confidence):
+    from datetime import datetime
+    conn = sqlite3.connect('recommendations.db')
+    conn.execute("""
+        INSERT INTO logs (timestamp, district, crop, dat, spray_action, dose, pest_action, soil_score, confidence)
+        VALUES (?,?,?,?,?,?,?,?,?)
+    """, (datetime.now().strftime("%Y-%m-%d %H:%M"), district, crop, dat,
+          spray_label, dose, pest_label, soil_score, round(confidence,2)))
+    conn.commit()
+    conn.close()
+
+def get_history():
+    conn = sqlite3.connect('recommendations.db')
+    df = pd.read_sql("SELECT * FROM logs ORDER BY id DESC LIMIT 20", conn)
+    conn.close()
+    return df
+
+init_db()
+
 spray_model, pest_model, le_spray, le_pest = load_models()
 
 with st.sidebar:
@@ -369,7 +410,7 @@ with st.sidebar:
     st.markdown('<div class="sidebar-section"><div class="sidebar-section-label">🌾 Crop & Stage</div>', unsafe_allow_html=True)
     crop = st.selectbox("Crop", ["Paddy","Wheat","Maize"], label_visibility="collapsed")
     transplant_date = st.date_input("Transplanting date", value=date.today()-timedelta(days=32), max_value=date.today())
-    dat = (date.today() - transplant_date).days
+    dat = max(0, (date.today() - transplant_date).days)
     st.markdown(f'<div style="font-size:11px;color:var(--green-300);margin-top:4px">📅 Day {dat} of crop cycle</div></div>', unsafe_allow_html=True)
     # Auto-populate soil values from district profile
     soil = DISTRICT_SOIL.get(district, {"N":80,"P":45,"K":40,"ph":6.5,"temp":27,"humidity":80,"rainfall":220,"pest":0.35,"ndvi":0.70})
@@ -613,6 +654,14 @@ if get_rec:
     pest_proba  = pest_model.predict_proba(farmer[PEST_FEATURE_COLS])[0]
     pest_label  = le_pest.inverse_transform([pest_pred])[0]
 
+    # Log recommendation to SQLite
+    overall_score, _ = soil_suitability(N, P, K, ph, crop)
+    log_recommendation(
+        district, crop, dat, spray_label,
+        4.0 if N < 60 else 3.0 if N < 80 else 2.0,
+        pest_label, overall_score, float(max(spray_proba))
+    )
+
     explainer     = shap.TreeExplainer(spray_model)
     shap_vals     = explainer.shap_values(farmer[FEATURE_COLS])
     shap_for_pred = shap_vals[0, :, spray_pred]
@@ -853,6 +902,36 @@ if get_rec:
         </div>
     </div>
     ''', unsafe_allow_html=True)
+
+
+# ── Recommendation History ────────────────────────────────────────────────────
+st.markdown("""
+<div class="module-card" style="margin-top:20px">
+    <div class="module-card-header">
+        <div class="module-num">📋</div>
+        <div>
+            <div class="module-title">Recommendation History</div>
+            <div class="module-subtitle">Last 20 recommendations logged this session</div>
+        </div>
+    </div>
+</div>
+""".replace("</div>\n</div>","</div></div>"), unsafe_allow_html=True)
+
+history_df = get_history()
+if len(history_df) > 0:
+    history_df = history_df.rename(columns={
+        "timestamp":"Time","district":"District","crop":"Crop",
+        "dat":"DAT","spray_action":"Spray","dose":"Dose ml/L",
+        "pest_action":"Pest","soil_score":"Soil %","confidence":"Confidence"
+    })
+    history_df = history_df.drop(columns=["id"], errors="ignore")
+    st.dataframe(
+        history_df,
+        use_container_width=True,
+        hide_index=True,
+    )
+else:
+    st.info("No recommendations yet — click Get Recommendation to start logging.")
 
 st.markdown("""
 <div style="text-align:center;padding:20px 40px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:8px">
