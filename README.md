@@ -1,143 +1,112 @@
-# 🌾 Precision Agronomy Recommender
-### Hyper-Localized AI Advisory for Nano-Fertilizer Optimization & Low-Pesticide Agriculture
+# Precision Agronomy Recommender
 
-> **Intern Project — IFFCO x Data Science**  
-> Built as part of a data science internship to bridge the behavioral gap between traditional farming and nano-fertilizer technology.
+A tool that tells a farmer *when* to spray nano-fertilizer, *how much*, and whether a pest problem is serious enough to justify chemical pesticides at all.
 
----
+I built this during my data science internship (IFFCO x Data Science). It's still a work in progress, and I've tried to be upfront below about what works and what doesn't yet.
 
-## 🎯 What This Does
+## Why I built this
 
-This AI recommendation engine acts as a digital agronomist for individual farm plots. It combines soil health data, real-time weather, satellite imagery, and crop stage intelligence to give farmers two critical, hyper-local recommendations:
+Most smallholder farmers in India apply urea by broadcasting it across the field and spray pesticides on a fixed calendar, whether or not pests are actually around. That costs money, wears down the soil, and helps pests build resistance. Nano-fertilizers can fix a lot of this, but only if they're applied at the right growth stage and not right before rain. Farmers rarely have anyone telling them that for their own plot.
 
-**Module 1 — Nano-Fertilizer Optimizer**  
-Tells the farmer exactly when and how much Nano Urea Plus / Nano DAP to spray, based on their soil NPK levels, crop growth stage (Days After Transplanting), and an 8-hour rain-free window check.
+I wanted to see if a model could fill that gap.
 
-**Module 2 — Low-Pesticide Pest Risk Advisor**  
-Predicts outbreak probability using district pest history (KCC data) and satellite NDVI crop stress scores. Only recommends chemical pesticides when risk > 35% — otherwise recommends biological controls.
+## What it does
 
----
+**1. Fertilizer advice (XGBoost).** Given the soil's NPK levels, how many days since transplanting, and the weather forecast, it recommends how much Nano Urea Plus or Nano DAP to apply, and checks that there's an 8-hour rain-free window so the spray isn't wasted.
 
-## 💡 Problem Statement
+**2. Pest risk (LightGBM).** Using past pest reports for the district (from KCC query data) and satellite crop-stress scores (NDVI), it estimates how likely an outbreak is. Above 35% risk it suggests chemical control. Below that, it points to biological options first.
 
-Indian smallholder farmers face a dual chemical overuse crisis:
-- Indiscriminate broadcasting of conventional urea degrades soil and costs ₹3,000–5,000/acre in inputs
-- Blanket pesticide schedules waste 30–40% of spend and build pest resistance
+I used SHAP so each recommendation comes with a reason. A farmer or an agronomist is far more likely to trust "your nitrogen is low and the crop is at tillering" than a bare number.
 
-The root cause: **no hyper-local, real-time, crop-stage-aware decision support exists at the farm level.**
+## Where things stand
 
----
+| Part | Status |
+|---|---|
+| Data exploration | Done |
+| ETL pipeline | CONFIRM |
+| Fertilizer model | CONFIRM |
+| Pest risk model | CONFIRM |
+| FastAPI backend (`app.py`) | CONFIRM |
+| Cloud deployment | Not yet |
+| Multilingual chatbot, offline mobile mode | Not yet |
+| Field pilot | Not yet |
 
-## 🏗️ Architecture
+*(Edit the CONFIRM rows to Done, In progress, or Not yet before publishing.)*
 
-```
-Data Sources                 AI Engine                    Delivery
-─────────────────────────    ──────────────────────────   ──────────────────
-Soil Health Cards (SHC)  ──▶                             
-IMD Weather API          ──▶  Module 1: XGBoost          
-KCC Pest Data (NCIPM)   ──▶  + SHAP Explainability  ──▶  FastAPI ──▶ IFFCO Kisan App
-Satellite NDVI           ──▶                              (11 languages)
-GPS Field Mapping        ──▶  Module 2: LightGBM         
-                              + Pest Risk Threshold   
-```
+### Results
 
----
+| Model | Data | Metric | Score |
+|---|---|---|---|
+| Fertilizer (XGBoost) | [rows] | [metric] | [value] |
+| Pest risk (LightGBM) | [rows] | [metric] | [value] |
 
-## 📊 Expected Impact
+*(Fill in from your training notebook, or delete this table if the models aren't trained yet.)*
 
-| Metric | Conventional | This System | Improvement |
-|--------|-------------|-------------|-------------|
-| Nitrogen Use Efficiency | 30–40% | 85–90% | +50% |
-| Input Cost / Acre | ₹3,000–5,000 | ₹2,300–3,800 | 20–25% saving |
-| N₂O Emissions | Baseline | — | 45% reduction |
-| Pesticide Spend | Baseline | — | 30–40% saving |
-| Application Accuracy | Manual broadcast | GPS-guided spray | Eliminates overuse |
+### A note on the impact numbers
 
----
+Nano-fertilizer research suggests big gains in nitrogen use efficiency and 20-25% lower input costs. Those are the goals this project is designed around. **I haven't measured them**, since that would need a real field trial.
 
-## 📁 Project Structure
+## How it fits together
 
 ```
-precision-agronomy-recommender/
-├── data/
-│   ├── raw/              # Unmodified source datasets (gitignored)
-│   │   ├── README.md     # Download instructions for all datasets
-│   │   └── iffco_nano_urea_specs.json
-│   └── processed/        # ETL pipeline outputs
-├── notebooks/
-│   ├── 01_data_exploration.ipynb   # Phase 1 ← START HERE
-│   ├── 02_etl_pipeline.ipynb       # Phase 2
-│   └── 03_model_training.ipynb     # Phase 3
-├── src/
-│   ├── config.py          # Rules engine — IFFCO hard constraints
-│   ├── feature_schema.py  # Data contracts for entire pipeline
-│   ├── etl.py             # Phase 2
-│   └── models.py          # Phase 3
-├── api/                   # FastAPI app — Phase 4
-├── requirements.txt
-└── .env                   # API keys (never commit this)
+Soil Health Cards ─┐
+Weather (Open-Meteo) ─┤
+KCC pest data ────────┼──> XGBoost (fertilizer) ─┐
+Satellite NDVI ───────┤    LightGBM (pest risk) ─┼──> FastAPI ──> SQLite log
+Crop NPK dataset ─────┘    SHAP explanations ────┘
 ```
 
----
-
-## 🚀 Setup
+## Running it yourself
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/precision-agronomy-recommender.git
-cd precision-agronomy-recommender
+git clone https://github.com/ispsitipsiecoder/agronomy-recommender-model.git
+cd agronomy-recommender-model
 
-# 2. Install dependencies
+python -m venv venv
+source venv/bin/activate          # on Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# 3. Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys
-
-# 4. Download datasets (see data/raw/README.md for instructions)
-
-# 5. Run Phase 1 notebook
-jupyter notebook notebooks/01_data_exploration.ipynb
+cp .env.example .env              # add your own API keys
 ```
 
----
+Download the datasets using the instructions in `data/raw/README.md`, then start with `notebooks/01_data_exploration.ipynb`. To try the API:
 
-## 📦 Data Sources
+```bash
+uvicorn app:app --reload
+```
 
-| Dataset | Source | Purpose |
-|---------|--------|---------|
-| Crop Recommendation (NPK) | [Kaggle](https://www.kaggle.com/datasets/atharvaingle/crop-recommendation-dataset) | Base soil-crop training data |
-| Soil Health Cards (SHC) | [soilhealth.dac.gov.in](https://soilhealth.dac.gov.in) | District-level soil micronutrients |
-| KCC Pest Queries | [KCC-CHAKSHU (ICAR-IASRI)](https://kcc-chakshu.icar-web.com) | District pest outbreak history |
-| Weather Forecast | [Open-Meteo](https://open-meteo.com) (dev) / IMD (prod) | 8-hour rain-free spray window |
-| Satellite NDVI | NASA MODIS / Sentinel Hub | Crop stress detection |
+and open http://127.0.0.1:8000/docs.
 
----
+## What's in the repo
 
-## 🔬 Tech Stack
+- `notebooks/` holds the exploration, ETL, and model training notebooks, in order.
+- `src/` has the config (IFFCO product rules), the feature schema, and the ETL and model code.
+- `models/` stores trained model files.
+- `app.py` is the API.
+- `data/` is where datasets go. Raw data isn't committed.
 
-- **ML Models:** XGBoost (fertilizer), LightGBM (pest risk)
-- **Explainability:** SHAP values
-- **Geospatial:** GeoPandas
-- **API:** FastAPI + Uvicorn
-- **Cloud:** Oracle Cloud Infrastructure (OCI)
-- **Mobile:** TensorFlow Lite (offline inference)
-- **Chatbot:** Rasa / Dialogflow (Hindi + English + 9 regional languages)
+## Data sources
 
----
+- [Crop Recommendation dataset](https://www.kaggle.com/datasets/atharvaingle/crop-recommendation-dataset) (Kaggle) for base soil and crop data
+- [Soil Health Cards](https://soilhealth.dac.gov.in) for district soil micronutrients
+- [KCC-CHAKSHU](https://kcc-chakshu.icar-web.com) for pest query history
+- [Open-Meteo](https://open-meteo.com) for weather forecasts
+- NASA MODIS / Sentinel Hub for NDVI
 
-## 🗺️ Roadmap
+## Tech
 
-| Phase | Weeks | Status |
-|-------|-------|--------|
-| Phase 1: Foundation & Data Scoping | 1–3 | 🟡 In Progress |
-| Phase 2: Data Kitchen (ETL Pipeline) | 4–7 | ⬜ Planned |
-| Phase 3: Model Development + SHAP | 8–12 | ⬜ Planned |
-| Phase 4: Cloud Backend + FastAPI | 13–16 | ⬜ Planned |
-| Phase 5: Chatbot Integration | 17–20 | ⬜ Planned |
-| Phase 6: Pilot A/B Test | 21+ | ⬜ Planned |
+Python, Pandas, NumPy, Scikit-learn, XGBoost, LightGBM, SHAP, GeoPandas, FastAPI, SQLite.
 
----
+## What I'd do next
 
-## 📝 License
-Built for internship and academic purposes. IFFCO product data sourced from publicly available FCO-approved specifications.
+1. Finish and validate both models on held-out data.
+2. Deploy the API to the cloud.
+3. Add a simple Hindi and English chatbot front end.
+4. Test with real farm plots, which is the only way to know if the recommendations help.
+
+## About
+
+Kartikey Negi, B.Tech CSE (Data Science), Amity University.
+[LinkedIn](https://linkedin.com/in/kartikey-negi-7b265a279) | kartikeynegii10@gmail.com
+
+Built for internship and academic purposes. IFFCO product details come from publicly available FCO-approved specifications.
